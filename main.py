@@ -202,6 +202,53 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
         }
     }
 
+@app.get("/realm_analytics/{string_id}")
+async def get_server_analytics(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(verify_jwt_token),
+    string_id: str = Path(..., description="string_id do realm(nome do domínio sem os pontos)")
+):
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=15)
+
+    realm_stmt_subquery = (select(realms_table.c.id).select_from(realms_table).where(realms_table.c.string_id == string_id).scalar_subquery())
+
+    counts_stmt = select(
+        select(func.count()).select_from(realms_table).where(realms_table.c.id == realm_stmt_subquery).scalar_subquery(),
+        select(func.count()).select_from(users_table).where(users_table.c.realm_id == realm_stmt_subquery).scalar_subquery(),
+        select(func.count()).select_from(messages_table).where(messages_table.c.realm_id == realm_stmt_subquery).scalar_subquery(),
+        select(func.count()).select_from(users_table).where(users_table.c.realm_id == realm_stmt_subquery, users_table.c.last_login >= cutoff_date).scalar_subquery(),
+        select(func.count()).select_from(messages_table).where(messages_table.c.realm_id == realm_stmt_subquery, messages_table.c.date_sent >= cutoff_date).scalar_subquery(),
+    )
+    
+    clients_stmt = (
+        select(
+            clients_table.c.name, 
+            func.count(messages_table.c.id).label("total")
+        )
+        .select_from(messages_table)
+        .join(clients_table, messages_table.c.sending_client_id == clients_table.c.id)
+        .where(messages_table.c.realm_id == realm_stmt_subquery)
+        .group_by(clients_table.c.name)
+    )
+
+    counts_result = (await db.execute(counts_stmt)).tuples().one()
+    clients_result = (await db.execute(clients_stmt)).all()
+
+    total_realms, total_users, total_messages, active_users_15_days, messages_15_days = counts_result
+
+    clients_count = {name: count for name, count in clients_result}
+
+    return {
+        'data': {
+            'total_realms': total_realms,
+            'total_users': total_users,
+            'total_messages': total_messages,
+            'active_users_15_days': active_users_15_days,
+            'messages_15_days': messages_15_days,
+            'clients_count_connection': clients_count
+        }
+    }
+    
 @app.get("/status_realm")
 async def get_realms_with_users(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
     # 1. Busca os Realms
