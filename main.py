@@ -166,24 +166,30 @@ async def get_all_realms(db: AsyncSession = Depends(get_db), user: dict = Depend
 async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=15)
 
-    stmt = select(
+    counts_stmt = select(
         select(func.count()).select_from(realms_table).scalar_subquery(),
         select(func.count()).select_from(users_table).scalar_subquery(),
         select(func.count()).select_from(messages_table).scalar_subquery(),
         select(func.count()).select_from(users_table).where(users_table.c.last_login >= cutoff_date).scalar_subquery(),
         select(func.count()).select_from(messages_table).where(messages_table.c.date_sent >= cutoff_date).scalar_subquery(),
-        select(messages_table.c.sending_client_id).select_from(messages_table).scalars().all(),
-        select(clients_table.c.id, clients_table.c.name).select_from(clients_table).scalars().all()
+    )
+    
+    clients_stmt = (
+        select(
+            clients_table.c.name, 
+            func.count(messages_table.c.id).label("total")
+        )
+        .select_from(messages_table)
+        .join(clients_table, messages_table.c.sending_client_id == clients_table.c.id)
+        .group_by(clients_table.c.name)
     )
 
-    result = await db.execute(stmt)
-    total_realms, total_users, total_messages, active_users_15_days, messages_15_days, messages_sent_client, clients = result.tuples().one()
- 
-    for message_client in messages_sent_client:
-        context = {}
-        for client in clients:
-            if message_client['sending_client_id'] == client['id']:
-                context[client.name] += 1 
+    counts_result = (await db.execute(counts_stmt)).tuple().one()
+    clients_result = (await db.execute(clients_stmt)).all()
+
+    total_realms, total_users, total_messages, active_users_15_days, messages_15_days = counts_result
+
+    clients_count = {name: count for name, count in clients_result}
 
     return {
         'data': {
@@ -192,7 +198,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
             'total_messages': total_messages,
             'active_users_15_days': active_users_15_days,
             'messages_15_days': messages_15_days,
-            'clients_count_connection': context
+            'clients_count_connection': clients_count
         }
     }
 
