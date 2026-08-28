@@ -172,8 +172,8 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
         select(func.count()).select_from(messages_table).scalar_subquery(),
         select(func.count()).select_from(users_table).where(users_table.c.last_login >= cutoff_date).scalar_subquery(),
         select(func.count()).select_from(messages_table).where(messages_table.c.date_sent >= cutoff_date).scalar_subquery(),
-        select(messages_table.c.sending_client_id).select_from(messages_table).scalar_subquery(),
-        select(clients_table.c.id, clients_table.c.name).select_from(clients_table).scalar()
+        select(messages_table.c.sending_client_id).select_from(messages_table).scalars().all(),
+        select(clients_table.c.id, clients_table.c.name).select_from(clients_table).scalars().all()
     )
 
     result = await db.execute(stmt)
