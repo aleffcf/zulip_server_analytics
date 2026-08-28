@@ -151,7 +151,7 @@ async def get_server_realms(db: AsyncSession = Depends(get_db), user: dict = Dep
     realms_result = (await db.execute(realms_stmt)).all()
 
     return {
-        'data': dict(realms_result)
+        'data': { 'name': name, 'string_id': string_id for name, string_id in realms_result}
     }
 
 @app.get("/server_analytics")
