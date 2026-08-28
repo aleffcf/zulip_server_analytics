@@ -150,10 +150,8 @@ async def get_server_realms(db: AsyncSession = Depends(get_db), user: dict = Dep
 
     realms_result = (await db.execute(realms_stmt)).all()
 
-    realm_parse = { 'name': name, 'string_id': string_id for name, string_id in realms_result}
-
     return {
-        'data': realm_parse
+        'data': [{'name': name, 'string_id': string_id} for name, string_id in realms_result]
     }
 
 @app.get("/server_analytics")
