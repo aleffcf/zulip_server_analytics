@@ -65,11 +65,12 @@ async def lifespan(app: FastAPI):
     global messages_table
 
     async with engine.begin() as conn:
-       await conn.run_sync(metadata.reflect, only=["zerver_realm", "zerver_userprofile", "zerver_message"])
+       await conn.run_sync(metadata.reflect, only=["zerver_realm", "zerver_userprofile", "zerver_message", "zerver_client"])
 
     realms_table = metadata.tables["zerver_realm"]
     users_table = metadata.tables["zerver_userprofile"]
     messages_table = metadata.tables["zerver_message"]
+    clients_table = metadata.tables["zerver_client"]
 
     # Lógica de Startup (ex: testar conexão com o DB)
     yield
@@ -168,26 +169,29 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
         select(func.count()).select_from(realms_table).scalar_subquery(),
         select(func.count()).select_from(users_table).scalar_subquery(),
         select(func.count()).select_from(messages_table).scalar_subquery(),
-
         select(func.count()).select_from(users_table).where(users_table.c.last_login >= cutoff_date).scalar_subquery(),
-
-        select(func.count()).select_from(messages_table).where(messages_table.c.date_sent >= cutoff_date).scalar_subquery()
+        select(func.count()).select_from(messages_table).where(messages_table.c.date_sent >= cutoff_date).scalar_subquery(),
+        select(messages_table.c.sending_client_id).select_from(messages_table).scalar_subquery(),
+        select(clients_table.c.id, clients_table.c.name).select_from(clients_table).scalar_subquery()
     )
-   
-# last_login
-# 'date_sent': datetime.datetime(2025, 9, 18, 15, 28, 4, 108451, tzinfo=datetime.timezone.utc),
-# 'sending_client_id': 2,
 
     result = await db.execute(stmt)
-    total_realms, total_users, total_messages, active_users_15_days, messages_15_days = result.tuples().one()
+    total_realms, total_users, total_messages, active_users_15_days, messages_15_days, messages_sent_client, clients = result.tuples().one()
  
+    for message_client in messages_sent_client:
+        context = {}
+        for client in clients:
+            if message_client['sending_client_id'] == client['id']:
+                context[client.name] += 1 
+
     return {
         'data': {
             'total_realms': total_realms,
             'total_users': total_users,
             'total_messages': total_messages,
             'active_users_15_days': active_users_15_days,
-            'messages_15_days': messages_15_days
+            'messages_15_days': messages_15_days,
+            'clients_count_connection': context
         }
     }
 
