@@ -121,11 +121,6 @@ async def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Depends(b
 
 # Inicio das rotas
 
-# Rota HOME
-@app.get("/")
-async def hello():
-    return {'res':'Hello World!'}
-
 # Rota para Gerar/Renovar o Token JWT seguro informando a chave mestre
 @app.post("/token")
 @limiter.limit("5/minute")
@@ -142,28 +137,26 @@ async def login_for_access_token(request: Request, body: LoginPayload):
     
     return {"access_token": access_token, "token_type": "bearer", "expires_in_hours": ACCESS_TOKEN_EXPIRE_HOURS}
 
-# Rotas de Realm
-@app.get("/all_realms")
-async def get_all_realms(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
-    # Constrói o select na tabela refletida no lifespan
-    stmt = select(
-        realms_table.c.id,
-        realms_table.c.name,
-        realms_table.c.string_id,
-        realms_table.c.description
+# --- Rota  ---
+@app.get("/server_realms")
+async def get_server_realms(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
+    realms_stmt = (
+        select(
+            realms_table.c.name,
+            realms_table.c.string_id,
+        )
+        .select_from(realms_table)
     )
-    
-    # Executa a query usando a sessão injetada pelo FastAPI
-    result = await db.execute(stmt)
-    rows = result.all()
-    
-    # Transforma os resultados em uma lista de dicionários para serializar em JSON
-    realms_list = [dict(row._mapping) for row in rows]
-    
-    return {'res': realms_list }
+
+    realms_result = (await db.execute(realms_stmt)).all()
+
+    return {
+        'data': realms_result
+    }
 
 @app.get("/server_analytics")
 async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
+    
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=15)
 
     counts_stmt = select(
@@ -203,7 +196,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
     }
 
 @app.get("/realm_analytics/{string_id}")
-async def get_server_analytics(
+async def get_realm_analytics(
     db: AsyncSession = Depends(get_db),
     user: dict = Depends(verify_jwt_token),
     string_id: str = Path(..., description="string_id do realm(nome do domínio sem os pontos)")
@@ -248,47 +241,3 @@ async def get_server_analytics(
             'clients_count_connection': clients_count
         }
     }
-    
-@app.get("/status_realm")
-async def get_realms_with_users(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
-    # 1. Busca os Realms
-    stmt_realms = select(
-        realms_table.c.id,
-        realms_table.c.name,
-        realms_table.c.string_id
-    )
-    result_realms = await db.execute(stmt_realms)
-    realms = [dict(row._mapping) for row in result_realms.all()]
-
-    # 2. Busca os Usuários
-    stmt_users = select(
-        users_table.c.id,
-        users_table.c.email,
-        users_table.c.full_name,
-        users_table.c.is_active,
-        users_table.c.realm_id
-    )
-    result_users = await db.execute(stmt_users)
-    users = [dict(row._mapping) for row in result_users.all()]
-
-    stmt_messages = select(
-        messages_table
-    )
-
-    result_messages = await db.execute(stmt_messages)
-    messages = [dict(row._mapping) for row in result_messages.all()]
-
-    # 3. Agrupa os usuários por realm_id em um dicionário para busca rápida O(1)
-    users_by_realm = {}
-    for u in users:
-        r_id = u["realm_id"]
-        if r_id not in users_by_realm:
-            users_by_realm[r_id] = []
-        users_by_realm[r_id].append(u)
-
-    # 4. Injeta a lista de usuários dentro do respectivo Realm
-    for r in realms:
-        # Se não houver usuários, retorna uma lista vazia []
-        r["users"] = users_by_realm.get(r["id"], [])
-
-    return {'res': realms, 'messages': len(messages)}
