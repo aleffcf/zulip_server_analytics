@@ -137,7 +137,7 @@ async def login_for_access_token(request: Request, body: LoginPayload):
     
     return {"access_token": access_token, "token_type": "bearer", "expires_in_hours": ACCESS_TOKEN_EXPIRE_HOURS}
 
-# --- Rota  ---
+# --- Lista realms do servidor ---
 @app.get("/server_realms")
 async def get_server_realms(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
     realms_stmt = (
@@ -154,6 +154,7 @@ async def get_server_realms(db: AsyncSession = Depends(get_db), user: dict = Dep
         'data': [{'name': name, 'string_id': string_id} for name, string_id in realms_result]
     }
 
+# --- Lista estatisticas do servidor ---
 @app.get("/server_analytics")
 async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = Depends(verify_jwt_token)):
     
@@ -195,6 +196,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
         }
     }
 
+# --- Lista de estatisticas por realm do servidor ---
 @app.get("/realm_analytics/{string_id}")
 async def get_realm_analytics(
     db: AsyncSession = Depends(get_db),
@@ -242,6 +244,7 @@ async def get_realm_analytics(
         }
     }
 
+# --- Lista usuarios de um realm do servidor ---
 @app.get('/users_by_realm/{string_id}')
 async def get_users_by_realm(
     db: AsyncSession = Depends(get_db),
