@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import bcrypt
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Header
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Header, Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
