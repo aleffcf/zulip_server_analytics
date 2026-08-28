@@ -241,3 +241,29 @@ async def get_realm_analytics(
             'clients_count_connection': clients_count
         }
     }
+
+@app.get('/users_by_realm/{string_id}')
+async def get_users_by_realm(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(verify_jwt_token),
+    string_id: str = Path(..., description="Nome do domínio para verificação dos usuários")
+):
+    realm_stmt_subquery = (select(realms_table.c.id).select_from(realms_table).where(realms_table.c.string_id == string_id).scalar_subquery())
+
+    users_stmt = (
+        select(
+            users_table.c.full_name,
+            users_table.c.email,
+            users_table.c.delivery_email,
+            users_table.c.is_active
+        )
+        .select_from(users_table)
+        .where(users_table.c.realm_id == realm_stmt_subquery)
+    )
+
+    users_result = (await db.execute(users_stmt)).all()
+
+    return {
+        'data': [
+            {'full_name': full_name, 'email': email, 'delivery_email': delivery_email, 'active': is_active} for full_name, email, delivery_email, is_active in users_result]
+    }
