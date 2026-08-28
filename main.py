@@ -177,7 +177,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
     )
 
     result = await db.execute(stmt)
-    total_realms, total_users, total_messages, active_users_15_days, messages_15_days, messages_sent_client, clients = result.tuples().one()
+    total_realms, total_users, total_messages, active_users_15_days, messages_15_days, messages_sent_client, clients = result.tuples()
  
     for message_client in messages_sent_client:
         context = {}
