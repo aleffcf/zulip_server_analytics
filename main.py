@@ -184,7 +184,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
         .group_by(clients_table.c.name)
     )
 
-    counts_result = (await db.execute(counts_stmt)).tuple().one()
+    counts_result = (await db.execute(counts_stmt)).tuples().one()
     clients_result = (await db.execute(clients_stmt)).all()
 
     total_realms, total_users, total_messages, active_users_15_days, messages_15_days = counts_result
