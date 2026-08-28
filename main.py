@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
     global realms_table
     global users_table
     global messages_table
+    global clients_table
 
     async with engine.begin() as conn:
        await conn.run_sync(metadata.reflect, only=["zerver_realm", "zerver_userprofile", "zerver_message", "zerver_client"])
