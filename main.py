@@ -218,6 +218,7 @@ async def get_realm_analytics(
         select(func.count()).select_from(messages_table).where(messages_table.c.realm_id == realm_stmt_subquery).scalar_subquery(),
         select(func.count()).select_from(users_table).where(users_table.c.realm_id == realm_stmt_subquery, users_table.c.last_login >= cutoff_date).scalar_subquery(),
         select(func.count()).select_from(messages_table).where(messages_table.c.realm_id == realm_stmt_subquery, messages_table.c.date_sent >= cutoff_date).scalar_subquery(),
+        select(func.sum(attachments_table.c.size)).select_from(attachments_table).where(attachments_table.c.realm_id == realm_stmt_subquery).scalar_subquery()
     )
     
     clients_stmt = (
@@ -234,7 +235,7 @@ async def get_realm_analytics(
     counts_result = (await db.execute(counts_stmt)).tuples().one()
     clients_result = (await db.execute(clients_stmt)).all()
 
-    total_realms, total_users, total_messages, active_users_15_days, messages_15_days = counts_result
+    total_realms, total_users, total_messages, active_users_15_days, messages_15_days, used_storage = counts_result
 
     clients_count = {name: count for name, count in clients_result}
 
@@ -245,6 +246,7 @@ async def get_realm_analytics(
             'total_messages': total_messages,
             'active_users_15_days': active_users_15_days,
             'messages_15_days': messages_15_days,
+            'used_storage': used_storage,
             'clients_count_connection': clients_count
         }
     }
