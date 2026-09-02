@@ -201,7 +201,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
         }
     }
 
-/# --- Lista de estatisticas por realm do servidor ---
+# --- Lista de estatisticas por realm do servidor ---
 @app.get("/realm_analytics/{string_id}")
 async def get_realm_analytics(
     db: AsyncSession = Depends(get_db),
