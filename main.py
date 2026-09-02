@@ -46,6 +46,7 @@ metadata = MetaData()
 realms_table = None
 users_table = None
 messages_table = None
+attachments_table = None
 
 # Configuracao de autenticacao
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -64,14 +65,16 @@ async def lifespan(app: FastAPI):
     global users_table
     global messages_table
     global clients_table
+    global attachments_table
 
     async with engine.begin() as conn:
-       await conn.run_sync(metadata.reflect, only=["zerver_realm", "zerver_userprofile", "zerver_message", "zerver_client"])
+       await conn.run_sync(metadata.reflect, only=["zerver_realm", "zerver_userprofile", "zerver_message", "zerver_client", "zerver_attachment"])
 
     realms_table = metadata.tables["zerver_realm"]
     users_table = metadata.tables["zerver_userprofile"]
     messages_table = metadata.tables["zerver_message"]
     clients_table = metadata.tables["zerver_client"]
+    attachments_table = metadata.tables["zerver_attachment"]
 
     # Lógica de Startup (ex: testar conexão com o DB)
     yield
@@ -166,6 +169,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
         select(func.count()).select_from(messages_table).scalar_subquery(),
         select(func.count()).select_from(users_table).where(users_table.c.last_login >= cutoff_date).scalar_subquery(),
         select(func.count()).select_from(messages_table).where(messages_table.c.date_sent >= cutoff_date).scalar_subquery(),
+        select(func.sum(attachments_table.c.size)).select_from(attachments_table).scalar_subquery()
     )
     
     clients_stmt = (
@@ -181,7 +185,7 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
     counts_result = (await db.execute(counts_stmt)).tuples().one()
     clients_result = (await db.execute(clients_stmt)).all()
 
-    total_realms, total_users, total_messages, active_users_15_days, messages_15_days = counts_result
+    total_realms, total_users, total_messages, active_users_15_days, messages_15_days, used_storage = counts_result
 
     clients_count = {name: count for name, count in clients_result}
 
@@ -192,11 +196,12 @@ async def get_server_analytics(db: AsyncSession = Depends(get_db), user: dict = 
             'total_messages': total_messages,
             'active_users_15_days': active_users_15_days,
             'messages_15_days': messages_15_days,
-            'clients_count_connection': clients_count
+            'used_storage': used_storage,
+            'clients_count_connection': clients_count,
         }
     }
 
-# --- Lista de estatisticas por realm do servidor ---
+/# --- Lista de estatisticas por realm do servidor ---
 @app.get("/realm_analytics/{string_id}")
 async def get_realm_analytics(
     db: AsyncSession = Depends(get_db),
